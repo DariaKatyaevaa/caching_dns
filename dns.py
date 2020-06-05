@@ -1,26 +1,27 @@
 import socket
 from util import *
+import argparse
 
 
-def start_server():
+def start_server(ip="8.8.8.8"):
     cache = Cache()
     while 1:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.bind(('192.168.0.3', 53))
-                data, addr = sock.recvfrom(1024)
+                data, address = sock.recvfrom(1024)
                 parse_request = Parser(data)
-                value = cache.get_item((parse_request.name, parse_request.q_type))
-                if value is not None:
+                answer_from_cache = cache.get_item((parse_request.name, parse_request.q_type))
+                if answer_from_cache is not None:
                     print("ответ из кэша")
-                    p = parse_request.get_answer(value[2], value[0])
-                    sock.sendto(p, addr)
+                    p = parse_request.get_answer(answer_from_cache[2], answer_from_cache[0])
+                    sock.sendto(p, address)
                 else:
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as dns:
                         dns.bind(("192.168.0.3", 10))
-                        dns.sendto(data, ("8.8.8.8", 53))
+                        dns.sendto(data, (ip, 53))
                         out = dns.recvfrom(1024)[0]
-                    sock.sendto(out, addr)
+                    sock.sendto(out, address)
                     parse_answer = Parser(out)
                     for info in parse_answer.info:
                         cache.add(*info)
@@ -32,4 +33,11 @@ def start_server():
 
 
 if __name__ == '__main__':
-    start_server()
+    parser = argparse.ArgumentParser(description='Кэширующий DNS сервер'
+                                                 'Катяева Дарья КН-202 (МЕН280207)')
+    parser.add_argument('-d', '--dns', type=str, help='ip of dns')
+    args = parser.parse_args()
+    if args.dns:
+        start_server(args.dns)
+    else:
+        start_server()
